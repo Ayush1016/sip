@@ -1,0 +1,1518 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <title>Stock SIP Analyzer</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        :root {
+            --bg: #050509;
+            --bg-elevated: #141421;
+            --bg-soft: #1b1b2b;
+            --border-subtle: #26263a;
+            --text-main: #f9fafb;
+            --text-muted: #9ca3af;
+            --accent: #4ade80;
+            --accent-soft: rgba(74, 222, 128, 0.12);
+            --danger: #fb7185;
+            --input-bg: #0b0b13;
+            --shadow-soft: 0 22px 45px rgba(0, 0, 0, 0.6);
+        }
+
+        body.light-theme {
+            --bg: #e5e7f5;
+            --bg-elevated: #ffffff;
+            --bg-soft: #f3f4ff;
+            --border-subtle: #d4d4e5;
+            --text-main: #111827;
+            --text-muted: #6b7280;
+            --accent: #22c55e;
+            --accent-soft: rgba(34, 197, 94, 0.1);
+            --danger: #e11d48;
+            --input-bg: #f9fafb;
+            --shadow-soft: 0 18px 35px rgba(15, 23, 42, 0.15);
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            font-size: 14px; /* slightly bigger */
+            background: radial-gradient(circle at top left, #1e293b 0, var(--bg) 60%);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+        }
+
+        .shell {
+            max-width: 1380px; /* wider page */
+            width: 100%;
+            margin: 24px auto 32px;
+            padding: 0 20px;
+        }
+
+        /* Top bar */
+
+        .nav-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 12px;
+            gap: 12px;
+        }
+
+        .logo-wrap {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .logo-badge {
+            width: 36px;
+            height: 36px;
+            border-radius: 11px;
+            background: linear-gradient(135deg, #22c55e, #14b8a6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #0b1120;
+            font-weight: 700;
+            box-shadow: 0 12px 28px rgba(16, 185, 129, 0.5);
+        }
+
+        .app-title {
+            font-size: 20px;
+            font-weight: 700;
+            letter-spacing: 0.03em;
+            text-shadow: 0 1px 3px rgba(15, 23, 42, 0.5);
+        }
+
+        .app-subtitle {
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+
+        .theme-toggle {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            color: var(--text-muted);
+            cursor: pointer;
+        }
+
+        .toggle-switch {
+            width: 46px;
+            height: 24px;
+            border-radius: 999px;
+            background: var(--bg-soft);
+            border: 1px solid var(--border-subtle);
+            display: flex;
+            align-items: center;
+            padding: 2px;
+            transition: background 0.18s ease, border-color 0.18s ease;
+        }
+
+        .toggle-knob {
+            width: 20px;
+            height: 20px;
+            border-radius: 999px;
+            background: #f9fafb;
+            box-shadow: 0 1px 4px rgba(15, 23, 42, 0.5);
+            transform: translateX(0);
+            transition: transform 0.18s ease;
+        }
+
+        body.light-theme .toggle-switch {
+            background: var(--accent-soft);
+            border-color: var(--accent);
+        }
+        body.light-theme .toggle-knob {
+            transform: translateX(20px);
+        }
+
+        /* Tabs */
+
+        .nav-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 18px;
+            border-bottom: 1px solid var(--border-subtle);
+            padding-bottom: 6px;
+        }
+
+        .nav-tab {
+            padding: 7px 18px;
+            border-radius: 999px;
+            font-size: 14px;
+            border: 1px solid transparent;
+            background: transparent;
+            color: var(--text-muted);
+            cursor: pointer;
+        }
+
+        .nav-tab.active {
+            background: var(--accent-soft);
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        .page { display: none; }
+        .page.active { display: block; }
+
+        /* Cards / layout */
+
+        .card {
+            background: linear-gradient(145deg, var(--bg-elevated), var(--bg-soft));
+            border-radius: 20px;
+            box-shadow: var(--shadow-soft);
+            padding: 18px 20px 18px;
+            border: 1px solid var(--border-subtle);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .card::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(circle at top right, rgba(74, 222, 128, 0.1), transparent 60%);
+            pointer-events: none;
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .card-title {
+            font-size: 17px;
+            font-weight: 600;
+        }
+
+        .card-tag {
+            font-size: 12px;
+            padding: 5px 9px;
+            border-radius: 999px;
+            background: var(--accent-soft);
+            color: var(--accent);
+            border: 1px solid rgba(34, 197, 94, 0.4);
+        }
+
+        .muted {
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+
+        .grid-main {
+            display: grid;
+            grid-template-columns: minmax(0, 1.45fr) minmax(0, 1.1fr);
+            gap: 20px;
+        }
+
+        .grid-insight {
+            display: grid;
+            grid-template-columns: minmax(0, 1.4fr) minmax(0, 1.1fr);
+            gap: 20px;
+        }
+
+        .grid-portfolio {
+            display: grid;
+            grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+            gap: 20px;
+        }
+
+        @media (max-width: 900px) {
+            .grid-main,
+            .grid-insight,
+            .grid-portfolio {
+                grid-template-columns: minmax(0, 1fr);
+            }
+        }
+
+        .field-group { position: relative; z-index: 1; }
+        .field { margin-bottom: 10px; }
+
+        .field-label {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            font-size: 14px;
+            margin-bottom: 4px;
+        }
+        .field-label span.helper {
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        input, select {
+            width: 100%;
+            padding: 9px 11px;
+            border-radius: 10px;
+            border: 1px solid var(--border-subtle);
+            background: var(--input-bg);
+            color: var(--text-main);
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+        }
+        input:focus, select:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 1px var(--accent-soft);
+        }
+
+        .btn-row {
+            display: flex;
+            gap: 10px;
+            margin-top: 12px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            border-radius: 999px;
+            padding: 7px 16px;
+            border: none;
+            font-size: 13px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease;
+            white-space: nowrap;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #22c55e, #16a34a);
+            color: #0b1120;
+            font-weight: 500;
+            box-shadow: 0 10px 18px rgba(34, 197, 94, 0.38);
+        }
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 12px 22px rgba(34, 197, 94, 0.46);
+        }
+
+        .btn-secondary {
+            background: transparent;
+            border: 1px solid var(--border-subtle);
+            color: var(--text-muted);
+        }
+        .btn-secondary:hover {
+            background: rgba(148, 163, 184, 0.14);
+        }
+
+        .error {
+            color: var(--danger);
+            margin-top: 6px;
+            font-size: 12px;
+        }
+
+        .metrics {
+            margin-top: 10px;
+            padding: 9px 11px 7px;
+            border-radius: 12px;
+            background: rgba(15, 23, 42, 0.4);
+            border: 1px solid rgba(148, 163, 184, 0.35);
+            font-size: 13px;
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 6px 18px;
+        }
+        body.light-theme .metrics {
+            background: rgba(241, 245, 249, 0.9);
+        }
+        .metric-label { font-size: 12px; color: var(--text-muted); }
+        .metric-value { font-weight: 600; }
+
+        .pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            border-radius: 999px;
+            padding: 3px 9px 3px 6px;
+            background: rgba(56, 189, 248, 0.08);
+            border: 1px solid rgba(56, 189, 248, 0.5);
+            color: var(--text-muted);
+        }
+        .pill-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 999px;
+            background: #38bdf8;
+        }
+
+        .chart-card {
+            margin-top: 12px;
+        }
+
+        canvas { max-width: 100%; }
+
+        .search-bar-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 6px;
+        }
+
+        .search-box {
+            flex: 1;
+        }
+
+        .clear-btn {
+            background: transparent;
+            border-radius: 999px;
+            border: 1px solid var(--border-subtle);
+            color: var(--text-muted);
+            cursor: pointer;
+            width: 32px;
+            height: 32px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 15px;
+            transition: background 0.12s ease, color 0.12s ease;
+        }
+        .clear-btn:hover {
+            background: rgba(148, 163, 184, 0.18);
+        }
+
+        /* Fund insights list */
+
+        .result-list {
+            margin-top: 8px;
+            max-height: 280px;
+            overflow-y: auto;
+            border-radius: 12px;
+            border: 1px solid var(--border-subtle);
+            background: rgba(15, 23, 42, 0.5);
+        }
+        body.light-theme .result-list {
+            background: rgba(248, 250, 252, 0.98);
+        }
+
+        .result-row {
+            padding: 8px 11px;
+            font-size: 13px;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.24);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+        }
+        .result-row:last-child {
+            border-bottom: none;
+        }
+        .result-row:hover {
+            background: rgba(52, 211, 153, 0.08);
+        }
+        .result-main {
+            flex: 1;
+        }
+        .result-name {
+            font-weight: 500;
+        }
+        .result-meta {
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        .snapshot-grid {
+            display: grid;
+            grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+            gap: 10px;
+            margin-top: 8px;
+            font-size: 13px;
+        }
+        @media (max-width: 768px) {
+            .snapshot-grid { grid-template-columns: minmax(0, 1fr); }
+        }
+
+        .snapshot-label { color: var(--text-muted); font-size: 12px; }
+        .snapshot-value { font-weight: 500; }
+
+        .compare-panel {
+            font-size: 13px;
+            margin-top: 8px;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 999px;
+            border: 1px solid rgba(148, 163, 184, 0.6);
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+        .badge.success {
+            border-color: rgba(34, 197, 94, 0.8);
+            color: var(--accent);
+        }
+
+        /* Portfolio table */
+
+        .table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+            margin-top: 8px;
+        }
+        .table th,
+        .table td {
+            padding: 5px 6px;
+            text-align: left;
+        }
+        .table thead {
+            border-bottom: 1px solid rgba(148, 163, 184, 0.35);
+        }
+        .table tbody tr:nth-child(even) {
+            background: rgba(15, 23, 42, 0.3);
+        }
+        body.light-theme .table tbody tr:nth-child(even) {
+            background: rgba(241, 245, 249, 0.95);
+        }
+
+        .gain-pos { color: #22c55e; }
+        .gain-neg { color: #f97373; }
+
+        .portfolio-summary {
+            margin-top: 8px;
+            font-size: 12px;
+        }
+
+        .summary-box {
+            margin-top: 10px;
+            padding: 8px 10px;
+            border-radius: 12px;
+            background: rgba(34, 197, 94, 0.04);
+            border: 1px solid rgba(34, 197, 94, 0.4);
+            font-size: 12px;
+        }
+
+        .chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 3px 8px;
+            border-radius: 999px;
+            background: rgba(148, 163, 184, 0.16);
+            font-size: 11px;
+        }
+
+        .loading-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            border: 2px solid var(--accent);
+            border-top-color: transparent;
+            animation: spin 0.7s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+<div class="shell">
+    <!-- Top brand -->
+    <header class="nav-top">
+        <div class="logo-wrap">
+            <div class="logo-badge">₹</div>
+            <div>
+                <div class="app-title">Stock SIP Analyzer</div>
+                <div class="app-subtitle">SIP planner, fund insights & mini portfolio — one screen</div>
+            </div>
+        </div>
+
+        <div class="theme-toggle" onclick="toggleTheme()">
+            <span id="themeLabel">Dark mode</span>
+            <div class="toggle-switch">
+                <div class="toggle-knob"></div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Tabs -->
+    <nav class="nav-tabs">
+        <button id="tab-planner"   class="nav-tab active" onclick="switchPage('planner')">Planner</button>
+        <button id="tab-insights"  class="nav-tab" onclick="switchPage('insights')">Fund Insights</button>
+        <button id="tab-portfolio" class="nav-tab" onclick="switchPage('portfolio')">Portfolio</button>
+    </nav>
+
+    <!-- ========== PAGE 1: PLANNER ========== -->
+    <section id="page-planner" class="page active">
+        <div class="grid-main">
+            <!-- SIP -->
+            <section class="card">
+                <div class="card-header">
+                    <div>
+                        <div class="card-title">SIP Calculator</div>
+                        <div class="muted">Model SIP & lumpsum with inflation impact</div>
+                    </div>
+                    <div class="card-tag">Live</div>
+                </div>
+
+                <div class="field-group">
+                    <div class="field">
+                        <div class="field-label">
+                            <label for="monthlyInvestment">Monthly SIP (₹)</label>
+                        </div>
+                        <input id="monthlyInvestment" type="number" min="0" step="100" placeholder="e.g. 2000" />
+                    </div>
+                    <div class="field">
+                        <div class="field-label">
+                            <label for="lumpSumInvestment">Lump Sum (₹)</label>
+                            <span class="helper">Optional one-time</span>
+                        </div>
+                        <input id="lumpSumInvestment" type="number" min="0" step="5000" placeholder="e.g. 50000" />
+                    </div>
+                    <div class="field">
+                        <div class="field-label">
+                            <label for="tenureYears">Tenure (years)</label>
+                        </div>
+                        <input id="tenureYears" type="number" min="1" step="1" placeholder="e.g. 20" />
+                    </div>
+                    <div class="field">
+                        <div class="field-label">
+                            <label for="annualReturnRate">Expected Return (% p.a.)</label>
+                        </div>
+                        <input id="annualReturnRate" type="number" min="0" step="0.1" placeholder="e.g. 12" />
+                    </div>
+                    <div class="field">
+                        <div class="field-label">
+                            <label for="inflationRate">Inflation Rate (% p.a.)</label>
+                        </div>
+                        <input id="inflationRate" type="number" min="0" step="0.1" placeholder="e.g. 6" />
+                    </div>
+                    <div class="field">
+                        <div class="field-label">
+                            <label for="frequency">Frequency</label>
+                        </div>
+                        <select id="frequency">
+                            <option value="MONTHLY">Monthly</option>
+                            <option value="WEEKLY">Weekly</option>
+                        </select>
+                    </div>
+
+                    <div class="btn-row">
+                        <button class="btn btn-primary" onclick="calculateSip()">Calculate</button>
+                        <button class="btn btn-secondary" onclick="window.print()">Download PDF</button>
+                        <button class="btn btn-secondary" onclick="resetForm()">Reset</button>
+                    </div>
+
+                    <div id="error" class="error" style="display:none;"></div>
+
+                    <div id="sipResultBox" class="metrics" style="display:none;">
+                        <div>
+                            <div class="metric-label">Total Invested</div>
+                            <div class="metric-value" id="resTotalInvested">₹0</div>
+                        </div>
+                        <div>
+                            <div class="metric-label">Future Value</div>
+                            <div class="metric-value" id="resFutureValue">₹0</div>
+                        </div>
+                        <div>
+                            <div class="metric-label">Profit</div>
+                            <div class="metric-value" id="resProfit">₹0</div>
+                        </div>
+                        <div>
+                            <div class="metric-label">Real Value (after inflation)</div>
+                            <div class="metric-value" id="resRealFuture">₹0</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="sipChartCard" class="chart-card" style="display:none;">
+                    <div class="pill" style="margin-bottom:4px;">
+                        <span class="pill-dot"></span>
+                        <span>Wealth growth projection</span>
+                    </div>
+                    <canvas id="sipChart" height="170"></canvas>
+                </div>
+            </section>
+
+            <!-- Goal -->
+            <section class="card">
+                <div class="card-header">
+                    <div>
+                        <div class="card-title">Goal Calculator</div>
+                        <div class="muted">Reverse SIP for target corpus</div>
+                    </div>
+                </div>
+
+                <div class="field-group">
+                    <div class="field">
+                        <div class="field-label">
+                            <label for="goalTarget">Target amount (₹)</label>
+                        </div>
+                        <input id="goalTarget" type="number" min="0" placeholder="e.g. 10000000" />
+                    </div>
+                    <div class="field">
+                        <div class="field-label">
+                            <label for="goalTenure">Tenure (years)</label>
+                        </div>
+                        <input id="goalTenure" type="number" min="1" placeholder="e.g. 20" />
+                    </div>
+                    <div class="field">
+                        <div class="field-label">
+                            <label for="goalReturn">Expected Return (% p.a.)</label>
+                        </div>
+                        <input id="goalReturn" type="number" min="0" step="0.1" placeholder="e.g. 12" />
+                    </div>
+
+                    <div class="btn-row">
+                        <button class="btn btn-primary" onclick="calculateGoal()">Calculate required SIP</button>
+                    </div>
+
+                    <div id="goalResult" class="summary-box" style="display:none;"></div>
+                </div>
+            </section>
+        </div>
+    </section>
+
+    <!-- ========== PAGE 2: FUND INSIGHTS ========== -->
+    <section id="page-insights" class="page">
+        <section class="card">
+            <div class="card-header">
+                <div>
+                    <div class="card-title">Fund Insights & Quick Compare</div>
+                    <div class="muted">Search any mutual fund and view multi-year performance</div>
+                </div>
+                <div class="chip">
+                    <span class="pill-dot"></span>
+                    <span>Insights</span>
+                </div>
+            </div>
+
+            <div class="grid-insight">
+                <!-- LEFT: search + list + insight -->
+                <div>
+                    <div class="field">
+                        <div class="field-label">
+                            <label for="mfSearchInput">Search any mutual fund</label>
+                        </div>
+                        <div class="search-bar-row">
+                            <input
+                                    id="mfSearchInput"
+                                    class="search-box"
+                                    type="text"
+                                    placeholder="Type fund name, e.g. SBI, Nifty, Bluechip…"
+                                    onkeydown="if(event.key==='Enter'){ searchFunds(); }"
+                            />
+                            <button class="clear-btn" onclick="clearMfSearch()" title="Clear search">✕</button>
+                            <button class="btn btn-primary" onclick="searchFunds()" id="searchBtn">
+                                <span id="searchBtnLabel">Search</span>
+                                <span id="searchBtnSpinner" class="loading-dot" style="display:none;"></span>
+                            </button>
+                        </div>
+                        <div class="muted" id="searchStatus" style="margin-top:4px;font-size:12px;">
+                            Start typing a scheme name and press Enter or Search.
+                        </div>
+                    </div>
+
+                    <div id="resultsContainer" class="result-list" style="display:none;"></div>
+
+                    <!-- Selected fund insight -->
+                    <div id="insightContainer" style="margin-top:14px; display:none;">
+                        <div class="pill">
+                            <span class="pill-dot"></span>
+                            <span id="insightTitle">Selected fund</span>
+                        </div>
+
+                        <div class="snapshot-grid" style="margin-top:8px;">
+                            <div>
+                                <div class="snapshot-label">AMC</div>
+                                <div class="snapshot-value" id="insightFundHouse">—</div>
+
+                                <div class="snapshot-label" style="margin-top:4px;">Category</div>
+                                <div class="snapshot-value" id="insightCategory">—</div>
+
+                                <div class="snapshot-label" style="margin-top:4px;">Risk</div>
+                                <div class="snapshot-value" id="insightRisk">—</div>
+
+                                <div class="snapshot-label" style="margin-top:4px;">Expense ratio</div>
+                                <div class="snapshot-value" id="insightExpense">—</div>
+                            </div>
+                            <div>
+                                <div class="snapshot-label">Trailing returns (p.a.)</div>
+                                <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;">
+                                    As per latest data; values are annualised where applicable.
+                                </div>
+                                <canvas id="insightChart" height="130"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- RIGHT: quick compare -->
+                <div>
+                    <div class="card" style="padding:12px 14px 14px; box-shadow:none;">
+                        <div class="card-header" style="margin-bottom:6px;">
+                            <div>
+                                <div class="card-title" style="font-size:15px;">Quick compare</div>
+                                <div class="muted" style="font-size:12px;">
+                                    Pick two funds from latest search and compare their trailing returns.
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="field-group">
+                            <div class="field">
+                                <div class="field-label">
+                                    <label for="compareFundA">Fund A</label>
+                                </div>
+                                <select id="compareFundA">
+                                    <option value="">-- Select from search results --</option>
+                                </select>
+                            </div>
+                            <div class="field">
+                                <div class="field-label">
+                                    <label for="compareFundB">Fund B</label>
+                                </div>
+                                <select id="compareFundB">
+                                    <option value="">-- Select from search results --</option>
+                                </select>
+                            </div>
+
+                            <div class="btn-row" style="margin-top:6px;">
+                                <button class="btn btn-primary" onclick="compareFunds()">Compare</button>
+                            </div>
+
+                            <div id="compareResult" class="compare-panel" style="margin-top:8px;">
+                                <span class="muted">Run a search, then pick any two funds to compare 1Y / 3Y / 5Y returns.</span>
+                            </div>
+
+                            <!-- Comparison chart -->
+                            <div class="chart-card" style="margin-top:10px;">
+                                <canvas id="compareChart" height="150"></canvas>
+                            </div>
+
+                            <div style="margin-top:6px;font-size:11px;color:var(--text-muted);">
+                                Tip: from search results you can click on a fund to see detailed insight on
+                                the left, then use the dropdowns here to compare it with another choice.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </section>
+
+    <!-- ========== PAGE 3: PORTFOLIO ========== -->
+    <section id="page-portfolio" class="page">
+        <div class="grid-portfolio">
+            <!-- Portfolio editor -->
+            <section class="card">
+                <div class="card-header">
+                    <div>
+                        <div class="card-title">Mini Portfolio Tracker</div>
+                        <div class="muted">Track sample SIP-style positions with units & NAV</div>
+                    </div>
+                </div>
+
+                <div class="field-group">
+                    <div class="field">
+                        <div class="field-label">
+                            <label for="portfolioFund">Fund</label>
+                            <span class="helper">Search results from “Fund Insights” tab</span>
+                        </div>
+                        <select id="portfolioFund">
+                            <option value="">-- Select from latest search --</option>
+                        </select>
+                    </div>
+
+                    <div class="field">
+                        <div class="field-label">
+                            <label for="portfolioAmount">Invested amount (₹)</label>
+                        </div>
+                        <input id="portfolioAmount" type="number" min="0" placeholder="e.g. 50000" />
+                    </div>
+
+                    <div class="field">
+                        <div class="field-label">
+                            <label for="portfolioUnits">Units</label>
+                            <span class="helper">Optional; will be derived from NAV later</span>
+                        </div>
+                        <input id="portfolioUnits" type="number" min="0" step="0.0001" placeholder="e.g. 120.45" />
+                    </div>
+
+                    <div class="btn-row">
+                        <button class="btn btn-primary" onclick="addHolding()">Add to portfolio</button>
+                        <button class="btn btn-secondary" onclick="clearPortfolio()">Clear all</button>
+                    </div>
+
+                    <table class="table" id="portfolioTable" style="display:none;">
+                        <thead>
+                        <tr>
+                            <th>Fund</th>
+                            <th>Units</th>
+                            <th>Avg NAV</th>
+                            <th>Current NAV</th>
+                            <th>Invested</th>
+                            <th>Current value</th>
+                            <th>Gain</th>
+                            <th></th>
+                        </tr>
+                        </thead>
+                        <tbody id="portfolioBody"></tbody>
+                    </table>
+
+                    <div id="portfolioSummary" class="portfolio-summary"></div>
+                </div>
+            </section>
+
+            <!-- Portfolio charts -->
+            <section class="card">
+                <div class="card-header">
+                    <div>
+                        <div class="card-title">Portfolio allocation</div>
+                        <div class="muted">High-level view of invested split</div>
+                    </div>
+                </div>
+
+                <div>
+                    <canvas id="portfolioPie" height="200"></canvas>
+                    <div style="margin-top:10px;font-size:11px;color:var(--text-muted);">
+                        Add a few funds on the left and this chart will show allocation by fund.
+                    </div>
+                </div>
+            </section>
+        </div>
+    </section>
+</div>
+
+<script>
+    // ===== Global state =====
+    let sipChart = null;
+    let insightChart = null;
+    let compareChart = null;
+    let portfolioPie = null;
+
+    let lastSearchResults = [];   // from live search
+    const insightCache = {};      // schemeCode -> insight dto
+    const portfolio = [];         // { code, name, invested, units, avgNav, currentNav }
+
+    let lastSipData = null;
+    let lastInsightData = null;
+
+    // ===== Utility =====
+    function formatMoney(v) {
+        if (v == null || isNaN(v)) return "0";
+        return v.toLocaleString("en-IN", { maximumFractionDigits: 2, minimumFractionDigits: 2 });
+    }
+
+    function showError(msg) {
+        const box = document.getElementById("error");
+        box.style.display = "block";
+        box.textContent = msg;
+    }
+    function hideError() {
+        const box = document.getElementById("error");
+        box.style.display = "none";
+        box.textContent = "";
+    }
+
+    function switchPage(page) {
+        ["planner", "insights", "portfolio"].forEach(p => {
+            document.getElementById("page-" + p).classList.toggle("active", p === page);
+            document.getElementById("tab-" + p).classList.toggle("active", p === page);
+        });
+    }
+
+    // ===== Theme =====
+    function toggleTheme() {
+        document.body.classList.toggle("light-theme");
+        const isLight = document.body.classList.contains("light-theme");
+        document.getElementById("themeLabel").textContent = isLight ? "Light mode" : "Dark mode";
+        localStorage.setItem("theme", isLight ? "light" : "dark");
+        if (sipChart && lastSipData)   renderSipChart(lastSipData);
+        if (insightChart && lastInsightData) renderInsightChart(lastInsightData);
+        if (compareChart && lastComparePayload) renderCompareChart(lastComparePayload);
+        if (portfolioPie) renderPortfolioPie();
+    }
+    function initTheme() {
+        const stored = localStorage.getItem("theme");
+        if (stored === "light") document.body.classList.add("light-theme");
+        document.getElementById("themeLabel").textContent =
+            document.body.classList.contains("light-theme") ? "Light mode" : "Dark mode";
+    }
+
+    // ===== SIP Calculation =====
+    async function calculateSip() {
+        const monthlyInvestment   = parseFloat(document.getElementById("monthlyInvestment").value);
+        const lumpSumInvestment   = parseFloat(document.getElementById("lumpSumInvestment").value) || 0;
+        const tenureYears         = parseInt(document.getElementById("tenureYears").value);
+        const annualReturnRate    = parseFloat(document.getElementById("annualReturnRate").value);
+        const inflationRate       = parseFloat(document.getElementById("inflationRate").value) || 0;
+        const frequency           = document.getElementById("frequency").value || "MONTHLY";
+
+        if (!monthlyInvestment || !tenureYears || !annualReturnRate) {
+            showError("Please enter Monthly SIP, Tenure and Expected Return %.");
+            return;
+        }
+        hideError();
+
+        try {
+            const resp = await fetch("/api/sip/calculate", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    monthlyInvestment,
+                    lumpSumInvestment,
+                    tenureYears,
+                    annualReturnRate,
+                    inflationRate,
+                    frequency
+                })
+            });
+
+            if (!resp.ok) {
+                showError("SIP calculation failed. Status: " + resp.status);
+                return;
+            }
+
+            const data = await resp.json();
+            lastSipData = data;
+
+            document.getElementById("resTotalInvested").textContent = "₹" + formatMoney(data.totalInvested);
+            document.getElementById("resFutureValue").textContent  = "₹" + formatMoney(data.futureValue);
+            document.getElementById("resProfit").textContent        = "₹" + formatMoney(data.profit);
+            document.getElementById("resRealFuture").textContent    = "₹" + formatMoney(data.realFutureValue || 0);
+            document.getElementById("sipResultBox").style.display   = "grid";
+
+            renderSipChart(data);
+        } catch (e) {
+            console.error(e);
+            showError("Could not connect to server.");
+        }
+    }
+
+    function renderSipChart(data) {
+        if (!data || !data.projections) return;
+        const labels   = data.projections.map(p => "Year " + p.year);
+        const invested = data.projections.map(p => p.invested);
+        const value    = data.projections.map(p => p.value);
+
+        const ctx = document.getElementById("sipChart");
+        if (sipChart) sipChart.destroy();
+
+        const cs = getComputedStyle(document.body);
+        const textColor  = cs.getPropertyValue("--text-muted").trim() || "#9ca3af";
+        const gridColor  = cs.getPropertyValue("--border-subtle").trim() || "#374151";
+
+        sipChart = new Chart(ctx, {
+            type: "line",
+            data: {
+                labels,
+                datasets: [
+                    { label: "Invested", data: invested, borderWidth: 2, tension: 0.25 },
+                    { label: "Value",    data: value,    borderWidth: 2, tension: 0.25 }
+                ]
+            },
+            options: {
+                responsive: true,
+                plugins: { legend: { labels: { color: textColor } } },
+                scales: {
+                    x: { ticks: { color: textColor }, grid: { color: gridColor } },
+                    y: { ticks: { color: textColor }, grid: { color: gridColor } }
+                }
+            }
+        });
+
+        document.getElementById("sipChartCard").style.display = "block";
+    }
+
+    function resetForm() {
+        ["monthlyInvestment", "lumpSumInvestment", "tenureYears", "annualReturnRate", "inflationRate"]
+            .forEach(id => document.getElementById(id).value = "");
+        document.getElementById("frequency").value = "MONTHLY";
+        document.getElementById("sipResultBox").style.display = "none";
+        document.getElementById("sipChartCard").style.display = "none";
+        hideError();
+        if (sipChart) { sipChart.destroy(); sipChart = null; }
+    }
+
+    async function calculateGoal() {
+        const target = parseFloat(document.getElementById("goalTarget").value);
+        const years  = parseInt(document.getElementById("goalTenure").value);
+        const rate   = parseFloat(document.getElementById("goalReturn").value);
+
+        const box = document.getElementById("goalResult");
+        box.style.display = "none";
+        box.innerHTML = "";
+
+        if (!target || !years || !rate) {
+            box.style.display = "block";
+            box.innerHTML = "<span style='color:var(--danger);'>Please fill all goal fields.</span>";
+            return;
+        }
+
+        try {
+            const resp = await fetch("/api/sip/goal", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    targetAmount: target,
+                    tenureYears: years,
+                    annualReturnRate: rate
+                })
+            });
+
+            if (!resp.ok) {
+                box.style.display = "block";
+                box.innerHTML = "<span style='color:var(--danger);'>Server error: " + resp.status + "</span>";
+                return;
+            }
+
+            const data = await resp.json();
+            box.style.display = "block";
+            box.innerHTML =
+                "<b>Required monthly SIP:</b> ₹" + formatMoney(data.requiredMonthlySip || data.requiredSip || 0) + "<br>" +
+                "<b>Total invested:</b> ₹"      + formatMoney(data.totalInvested || 0)                     + "<br>" +
+                "<b>Expected profit:</b> ₹"     + formatMoney(data.profit || 0);
+        } catch (e) {
+            console.error(e);
+            box.style.display = "block";
+            box.innerHTML = "<span style='color:var(--danger);'>Failed to connect.</span>";
+        }
+    }
+
+    // ===== Fund Insights & Search =====
+    function setSearchLoading(isLoading) {
+        document.getElementById("searchBtnLabel").textContent = isLoading ? "Searching…" : "Search";
+        document.getElementById("searchBtnSpinner").style.display = isLoading ? "inline-block" : "none";
+        document.getElementById("searchBtn").disabled = isLoading;
+    }
+
+    async function searchFunds() {
+        const q = document.getElementById("mfSearchInput").value.trim();
+        const status = document.getElementById("searchStatus");
+        const container = document.getElementById("resultsContainer");
+
+        if (!q) {
+            status.textContent = "Type a mutual fund name and press Enter or Search.";
+            container.style.display = "none";
+            container.innerHTML = "";
+            return;
+        }
+
+        setSearchLoading(true);
+        status.textContent = "Searching…";
+        container.style.display = "none";
+        container.innerHTML = "";
+
+        try {
+            const resp = await fetch("/api/mutual-funds/live/search?q=" + encodeURIComponent(q));
+            if (!resp.ok) {
+                status.textContent = "Server error: " + resp.status;
+                setSearchLoading(false);
+                return;
+            }
+
+            const data = await resp.json();
+            lastSearchResults = data || [];
+
+            if (!data || data.length === 0) {
+                status.textContent = "No funds found for \"" + q + "\".";
+                setSearchLoading(false);
+                return;
+            }
+
+            status.textContent = "Showing " + data.length + " result(s). Click a row for insight.";
+            renderSearchResults(data);
+            populateCompareDropdowns(data);
+            populatePortfolioSelectFromSearch(data);
+
+        } catch (e) {
+            console.error(e);
+            status.textContent = "Could not reach server.";
+        } finally {
+            setSearchLoading(false);
+        }
+    }
+
+    function clearMfSearch() {
+        document.getElementById("mfSearchInput").value = "";
+        document.getElementById("searchStatus").textContent =
+            "Start typing a scheme name and press Enter or Search.";
+        document.getElementById("resultsContainer").style.display = "none";
+        document.getElementById("resultsContainer").innerHTML = "";
+    }
+
+    function renderSearchResults(list) {
+        const container = document.getElementById("resultsContainer");
+        container.innerHTML = "";
+        container.style.display = "block";
+
+        list.forEach((mf, index) => {
+            const row = document.createElement("div");
+            row.className = "result-row";
+            row.onclick = () => loadInsightForIndex(index);
+
+            const main = document.createElement("div");
+            main.className = "result-main";
+            main.innerHTML =
+                "<div class='result-name'>" + (mf.schemeName || "Unnamed scheme") + "</div>" +
+                "<div class='result-meta'>Code: " + (mf.schemeCode || "N/A") + "</div>";
+
+            row.appendChild(main);
+            container.appendChild(row);
+        });
+    }
+
+    async function loadInsightForIndex(index) {
+        const mf = lastSearchResults[index];
+        if (!mf) return;
+
+        const code = mf.schemeCode;
+        const name = mf.schemeName;
+
+        const cacheKey = code || name;
+        if (insightCache[cacheKey]) {
+            showInsight(name, insightCache[cacheKey]);
+            return;
+        }
+
+        try {
+            const resp = await fetch("/api/mutual-funds/insight?schemeCode=" +
+                encodeURIComponent(code || "") +
+                "&schemeName=" + encodeURIComponent(name || "")
+            );
+            if (!resp.ok) {
+                console.warn("Insight fetch error:", resp.status);
+                return;
+            }
+            const dto = await resp.json();
+            insightCache[cacheKey] = dto;
+            showInsight(name, dto);
+        } catch (e) {
+            console.error("Insight fetch failed", e);
+        }
+    }
+
+    function showInsight(displayName, dto) {
+        lastInsightData = dto;
+        const box = document.getElementById("insightContainer");
+        box.style.display = "block";
+
+        document.getElementById("insightTitle").textContent = displayName || "Selected fund";
+        document.getElementById("insightFundHouse").textContent = dto.fundHouse || "Unknown AMC";
+        document.getElementById("insightCategory").textContent = dto.category || "N/A";
+        document.getElementById("insightRisk").textContent     = dto.riskLevel || "N/A";
+        document.getElementById("insightExpense").textContent  =
+            dto.expenseRatio != null ? dto.expenseRatio + "%" : "N/A";
+
+        renderInsightChart(dto);
+    }
+
+    function renderInsightChart(dto) {
+        const labels = [];
+        const values = [];
+
+        if (dto.return1M != null) { labels.push("1M"); values.push(dto.return1M); }
+        if (dto.return6M != null) { labels.push("6M"); values.push(dto.return6M); }
+        if (dto.return1Y != null) { labels.push("1Y"); values.push(dto.return1Y); }
+        if (dto.return3Y != null) { labels.push("3Y"); values.push(dto.return3Y); }
+        if (dto.return5Y != null) { labels.push("5Y"); values.push(dto.return5Y); }
+        if (dto.return10Y != null){ labels.push("10Y");values.push(dto.return10Y);}
+
+        const ctx = document.getElementById("insightChart");
+        if (insightChart) insightChart.destroy();
+
+        const cs = getComputedStyle(document.body);
+        const textColor = cs.getPropertyValue("--text-muted").trim() || "#9ca3af";
+        const gridColor = cs.getPropertyValue("--border-subtle").trim() || "#374151";
+
+        insightChart = new Chart(ctx, {
+            type: "bar",
+            data: {
+                labels,
+                datasets: [{
+                    label: "Trailing return (% p.a.)",
+                    data: values,
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: { legend: { labels: { color: textColor } } },
+                scales: {
+                    x: { ticks: { color: textColor }, grid: { display: false } },
+                    y: { ticks: { color: textColor }, grid: { color: gridColor } }
+                }
+            }
+        });
+    }
+
+    // ===== Quick compare =====
+    function populateCompareDropdowns(list) {
+        const a = document.getElementById("compareFundA");
+        const b = document.getElementById("compareFundB");
+        a.innerHTML = "<option value=''>-- Select from search results --</option>";
+        b.innerHTML = "<option value=''>-- Select from search results --</option>";
+
+        list.forEach((mf, idx) => {
+            const text = (mf.schemeName || "Unnamed scheme");
+            const optA = document.createElement("option");
+            optA.value = idx;
+            optA.textContent = text;
+            a.appendChild(optA);
+
+            const optB = document.createElement("option");
+            optB.value = idx;
+            optB.textContent = text;
+            b.appendChild(optB);
+        });
+    }
+
+    let lastComparePayload = null;
+
+    async function compareFunds() {
+        const idxA = document.getElementById("compareFundA").value;
+        const idxB = document.getElementById("compareFundB").value;
+        const box  = document.getElementById("compareResult");
+
+        if (idxA === "" || idxB === "") {
+            box.innerHTML = "<span class='muted'>Pick two funds from the dropdowns above.</span>";
+            if (compareChart) { compareChart.destroy(); compareChart = null; }
+            return;
+        }
+        if (idxA === idxB) {
+            box.innerHTML = "<span style='color:var(--danger);'>Choose two different funds.</span>";
+            if (compareChart) { compareChart.destroy(); compareChart = null; }
+            return;
+        }
+
+        const mfA = lastSearchResults[parseInt(idxA)];
+        const mfB = lastSearchResults[parseInt(idxB)];
+        if (!mfA || !mfB) return;
+
+        const [insA, insB] = await Promise.all([
+            fetchInsightForCompare(mfA),
+            fetchInsightForCompare(mfB)
+        ]);
+
+        const oneA = insA.return1Y ?? 0;
+        const oneB = insB.return1Y ?? 0;
+        const threeA = insA.return3Y ?? 0;
+        const threeB = insB.return3Y ?? 0;
+        const fiveA = insA.return5Y ?? 0;
+        const fiveB = insB.return5Y ?? 0;
+
+        const better1Y   = oneA === oneB ? "Both similar 1Y" : (oneA > oneB ? mfA.schemeName : mfB.schemeName);
+        const better3Y   = threeA === threeB ? "Both similar 3Y" : (threeA > threeB ? mfA.schemeName : mfB.schemeName);
+        const better5Y   = fiveA === fiveB ? "Both similar 5Y" : (fiveA > fiveB ? mfA.schemeName : mfB.schemeName);
+
+        box.innerHTML =
+            "<div class='badge success'>Comparison</div><br><br>" +
+            "<b>Fund A:</b> " + mfA.schemeName + "<br>" +
+            "1Y: " + oneA  + "% • 3Y: " + threeA + "% • 5Y: " + fiveA + "%<br><br>" +
+            "<b>Fund B:</b> " + mfB.schemeName + "<br>" +
+            "1Y: " + oneB  + "% • 3Y: " + threeB + "% • 5Y: " + fiveB + "%<br><br>" +
+            "<b>Highlights:</b><br>" +
+            "• 1Y performance: <b>" + better1Y + "</b> looks stronger.<br>" +
+            "• 3Y performance: <b>" + better3Y + "</b> is ahead.<br>" +
+            "• 5Y performance: <b>" + better5Y + "</b> leads on long-term basis (if data available).";
+
+        lastComparePayload = {
+            aName: mfA.schemeName,
+            bName: mfB.schemeName,
+            valuesA: [oneA, threeA, fiveA],
+            valuesB: [oneB, threeB, fiveB]
+        };
+        renderCompareChart(lastComparePayload);
+    }
+
+    function renderCompareChart(payload) {
+        const labels = ["1Y", "3Y", "5Y"];
+        const ctx = document.getElementById("compareChart");
+        if (compareChart) compareChart.destroy();
+
+        const cs = getComputedStyle(document.body);
+        const textColor = cs.getPropertyValue("--text-muted").trim() || "#9ca3af";
+        const gridColor = cs.getPropertyValue("--border-subtle").trim() || "#374151";
+
+        compareChart = new Chart(ctx, {
+            type: "line",
+            data: {
+                labels,
+                datasets: [
+                    { label: payload.aName, data: payload.valuesA, borderWidth: 2, tension: 0.25 },
+                    { label: payload.bName, data: payload.valuesB, borderWidth: 2, tension: 0.25 }
+                ]
+            },
+            options: {
+                responsive: true,
+                plugins: { legend: { labels: { color: textColor } } },
+                scales: {
+                    x: { ticks: { color: textColor }, grid: { color: gridColor } },
+                    y: { ticks: { color: textColor }, grid: { color: gridColor } }
+                }
+            }
+        });
+    }
+
+    async function fetchInsightForCompare(mf) {
+        const key = mf.schemeCode || mf.schemeName;
+        if (insightCache[key]) return insightCache[key];
+
+        try {
+            const resp = await fetch("/api/mutual-funds/insight?schemeCode=" +
+                encodeURIComponent(mf.schemeCode || "") +
+                "&schemeName=" + encodeURIComponent(mf.schemeName || "")
+            );
+            if (!resp.ok) return {};
+            const dto = await resp.json();
+            insightCache[key] = dto;
+            return dto;
+        } catch {
+            return {};
+        }
+    }
+
+    // ===== Portfolio =====
+    function populatePortfolioSelectFromSearch(list) {
+        const sel = document.getElementById("portfolioFund");
+        sel.innerHTML = "<option value=''>-- Select from latest search --</option>";
+        list.forEach((mf, idx) => {
+            const opt = document.createElement("option");
+            opt.value = idx;
+            opt.textContent = mf.schemeName || "Unnamed scheme";
+            sel.appendChild(opt);
+        });
+    }
+
+    function addHolding() {
+        const idx = document.getElementById("portfolioFund").value;
+        const amt = parseFloat(document.getElementById("portfolioAmount").value);
+        let units = parseFloat(document.getElementById("portfolioUnits").value);
+
+        if (idx === "" || !lastSearchResults[idx]) {
+            alert("Select a fund from the dropdown.");
+            return;
+        }
+        if (!amt || amt <= 0) {
+            alert("Enter a valid invested amount.");
+            return;
+        }
+
+        const mf = lastSearchResults[idx];
+        const currentNav = 100; // placeholder NAV
+        if (!units || units <= 0) {
+            units = amt / currentNav;
+        }
+        const avgNav = amt / units;
+
+        portfolio.push({
+            code: mf.schemeCode,
+            name: mf.schemeName,
+            invested: amt,
+            units,
+            avgNav,
+            currentNav
+        });
+
+        document.getElementById("portfolioAmount").value = "";
+        document.getElementById("portfolioUnits").value = "";
+
+        renderPortfolio();
+    }
+
+    function clearPortfolio() {
+        portfolio.length = 0;
+        renderPortfolio();
+    }
+
+    function renderPortfolio() {
+        const body = document.getElementById("portfolioBody");
+        const table = document.getElementById("portfolioTable");
+        const summary = document.getElementById("portfolioSummary");
+
+        body.innerHTML = "";
+        if (portfolio.length === 0) {
+            table.style.display = "none";
+            summary.textContent = "No holdings yet. Add funds from the left.";
+            if (portfolioPie) { portfolioPie.destroy(); portfolioPie = null; }
+            return;
+        }
+
+        table.style.display = "table";
+        let totalInvested = 0;
+        let totalCurrent  = 0;
+
+        portfolio.forEach((h, idx) => {
+            const currentValue = h.units * h.currentNav;
+            const gain = currentValue - h.invested;
+            const gainPct = (gain / h.invested) * 100;
+
+            totalInvested += h.invested;
+            totalCurrent  += currentValue;
+
+            const tr = document.createElement("tr");
+            tr.innerHTML =
+                "<td>" + h.name + "</td>" +
+                "<td>" + h.units.toFixed(3) + "</td>" +
+                "<td>" + h.avgNav.toFixed(2) + "</td>" +
+                "<td>" + h.currentNav.toFixed(2) + "</td>" +
+                "<td>₹" + formatMoney(h.invested) + "</td>" +
+                "<td>₹" + formatMoney(currentValue) + "</td>" +
+                "<td class='" + (gain >= 0 ? "gain-pos" : "gain-neg") + "'>" +
+                    "₹" + formatMoney(gain) + " (" + gainPct.toFixed(1) + "%)" +
+                "</td>" +
+                "<td><button class='btn btn-secondary' style='padding:3px 8px;font-size:11px;' onclick='deleteHolding(" + idx + ")'>Remove</button></td>";
+            body.appendChild(tr);
+        });
+
+        const gainTotal = totalCurrent - totalInvested;
+        const gainPctTotal = (gainTotal / totalInvested) * 100;
+
+        summary.innerHTML =
+            "Portfolio invested: <b>₹" + formatMoney(totalInvested) + "</b> • " +
+            "Current value: <b>₹" + formatMoney(totalCurrent) + "</b> • " +
+            "Overall gain: <b class='" + (gainTotal >= 0 ? "gain-pos" : "gain-neg") + "'>" +
+            "₹" + formatMoney(gainTotal) + " (" + gainPctTotal.toFixed(1) + "%)</b>";
+
+        renderPortfolioPie();
+    }
+
+    function deleteHolding(index) {
+        portfolio.splice(index, 1);
+        renderPortfolio();
+    }
+
+    function renderPortfolioPie() {
+        const ctx = document.getElementById("portfolioPie");
+        if (portfolioPie) portfolioPie.destroy();
+
+        const labels = portfolio.map(h => h.name);
+        const data   = portfolio.map(h => h.invested);
+
+        portfolioPie = new Chart(ctx, {
+            type: "pie",
+            data: { labels, datasets: [{ data, borderWidth: 1 }] },
+            options: { responsive: true, plugins: { legend: { position: "bottom" } } }
+        });
+    }
+
+    // ===== Init =====
+    window.addEventListener("DOMContentLoaded", () => {
+        initTheme();
+    });
+</script>
+
+</body>
+</html>
